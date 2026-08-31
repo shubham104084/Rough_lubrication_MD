@@ -1,0 +1,383 @@
+# SYSTEM definition
+boundary p p f
+units metal
+atom_style full
+
+#read_data ../step_1_config_gen/config.data
+read_data equil_out_spring.data extra/bond/per/atom 4 extra/angle/per/atom 8 extra/dihedral/per/atom 16 extra/special/per/atom 64
+#read_restart restart.equil
+balance 1.1 shift xyz 20 1.0
+neighbor 1.0 bin 
+neigh_modify delay 1 check yes exclude type 3 4 # To switch off the interaction between real and pseudo atoms
+#comm_modify cutoff 10.0
+
+#write_data equil_vel.data pair ij
+#XX
+
+
+# INTERACTIONS
+# 1-4: Cu
+# 5 : O of DoD
+# 6 : H of DoD
+# 7 : O of H2O
+# 8 : H of H2O
+#
+#pair_style hybrid eam/alloy lj/cut 3.0
+special_bonds   lj/coul 0 0 0.5 
+
+#pair_style hybrid lj/cut 12.0 eam/alloy
+pair_style hybrid/overlay lj/cut/coul/long 12.0 eam/alloy lj/cut/tip4p/long 7 8 4 4 0.1546 12
+kspace_style pppm/tip4p  1.0e-4 #1.0e-5
+kspace_modify slab 3.0
+#pair_style eam/alloy
+## 1-4:Cu, 5:C of DoD, 6:H of DoD, 7: O of H2O, 8: H of H2O
+# 1: Top Cu wall (hydrophyllic)-> eps_water X 2 & eps_dod /2
+# 2: Bot Cu wall (hydrophobic) -> eps_DoD X 2 & eps_water /2
+pair_coeff * * eam/alloy ../../../params/Cu_mishin1.eam.alloy Cu Cu Cu Cu NULL NULL NULL NULL
+pair_coeff 5 5 lj/cut/coul/long 0.00290539571 3.5      # C-C (DoD)
+pair_coeff 6 6 lj/cut/coul/long 0.00130092345 2.5      # H-H (DoD)
+pair_coeff 7 7 lj/cut/tip4p/long 0.008 3.1589               # O-O (H2O)
+pair_coeff 8 8 lj/cut/tip4p/long 0.0 0.0                    # H-H (H2O)
+pair_coeff 7 8 lj/cut/tip4p/long 0.0 0.9572                 # O-H (H2O)
+pair_coeff 5 6 lj/cut/coul/long 0.00194414439 3.0      # C-H (DoD)
+pair_coeff 1 5 lj/cut/coul/long 0.01219299383 3.058    # Cu-C (Top-DoD)
+pair_coeff 2 5 lj/cut/coul/long 0.04877197532 2.9185   # Cu-C (Bot-DoD)
+pair_coeff 3 5 lj/cut/coul/long 0.02438598766 2.9185   # Cu-C (DoD)
+pair_coeff 4 5 lj/cut/coul/long 0.02438598766 2.9185   # Cu-C (DoD)
+pair_coeff 1 6 lj/cut/coul/long 0.008158936998 2.558   # Cu-H (Top-DoD)
+pair_coeff 2 6 lj/cut/coul/long 0.032635747992 2.4185  # Cu-H (Bot-DoD)
+pair_coeff 3 6 lj/cut/coul/long 0.016317873996 2.4185  # Cu-H (DoD)
+pair_coeff 4 6 lj/cut/coul/long 0.016317873996 2.4185  # Cu-H (DoD)
+
+pair_coeff 1 7 lj/cut/tip4p/long 0.081 2.8875              # Cu-O (Top-H2O)
+pair_coeff 2 7 lj/cut/tip4p/long 0.02025 2.8875              # Cu-O (Bot-H2O)
+pair_coeff 3 7 lj/cut/tip4p/long 0.0405 2.8875              # Cu-O (H2O)
+pair_coeff 4 7 lj/cut/tip4p/long 0.0405 2.8875              # Cu-O (H2O)
+pair_coeff 1 8 none                                    # Cu-H (H2O)
+pair_coeff 2 8 none                                    # Cu-H (H2O)
+pair_coeff 3 8 none                                    # Cu-H (H2O)
+pair_coeff 4 8 none                                    # Cu-H (H2O)
+
+pair_coeff 5 7 lj/cut/tip4p/long 0.00482111664 3.32945 # C-O (DoD-H2O)
+pair_coeff 6 7 lj/cut/tip4p/long 0.00322604829 2.82945 # H-O (DoD-H2O)
+pair_coeff 5 8 none
+pair_coeff 6 8 none
+
+#pair_coeff * * eam/alloy ../params/Cu_mishin1.eam.alloy NULL NULL NULL Cu
+#pair_coeff 1 2 lj/cut 0.0103 3.405 3.0
+#pair_coeff 3 4 harmonic/cut 2.0 20.0
+
+#
+# Setting up water
+#molecule H2O_mol ../params/H2OMol.txt toff 4 boff 1
+molecule DoD_mol ../../../Dodecane_sims/params/n_dodecane_opls2.mol toff 4 boff 1
+molecule H2O_mol ../../../params/H2OMol.txt toff 6 boff 3 aoff 3
+#DOD ../params/n_dodecane_opls.mol
+
+# Value source: J. Am. Chem. Soc. 1996, 118, 45, 11225–11236
+bond_style harmonic
+bond_coeff 1 2.2e-2 20.0 # Cu- Cu(Pseudo)
+bond_coeff 2   11.6216 1.529   #13.443  1.529   # CT-CT
+bond_coeff 3   14.7438 1.090  #14.744  1.090   # CT-HC
+bond_coeff 4 0 0.9572 # O-H of H2O
+
+angle_style harmonic
+angle_coeff 1   1.4310 107.8   # 1.4310   107.8   # H-C-H
+angle_coeff 2   2.5368 112.7   #2.7319   112.7   # C-C-C
+angle_coeff 3   1.6262 110.7   #1.5177   110.7   # C-C-H
+angle_coeff 4   0 104.52                         # H-O-H
+
+dihedral_style  opls
+dihedral_coeff 1  0.0754535 -0.00680816  0.0120986 0.000  # C-C-C-C
+dihedral_coeff 2  0.0000000  0.00000000  0.0158713 0.000  # C-C-C-H
+dihedral_coeff 3  0.0000000  0.00000000  0.0137898  0.000  # H-C-C-H
+
+#balance 1.1 shift xyz 20 1.0
+# VARIABLES
+variable dump_dir string dumps
+variable runs equal 2e4
+variable dt equal 2e-3
+variable indent_rate equal 0.1  #  unit is 100 m/s
+
+variable speed_top equal -0.5*${indent_rate}
+variable speed_bot equal 0.5*${indent_rate}
+
+
+# SHELL COMMANDS
+shell mkdir ${dump_dir}
+shell mkdir restarts
+
+# PARAMS
+timestep ${dt}
+
+#velocity all create 300.0 4928459 rot yes mom yes dist gaussian
+
+## Region for freezing and integration
+#region top_freeze block INF INF INF INF 92.0 INF
+#region bot_freeze block INF INF INF INF INF -93.6
+#region freeze union 2 top_freeze bot_freeze
+
+region top block INF INF INF INF 0.0 INF
+region bot block INF INF INF INF INF 0.0
+#region h2o block INF INF INF INF -3.0 23.0
+#region h2o block INF INF INF INF -59.0 54.0
+
+#region h2o block 0.0 500.0 0.0 15.625 -4.0 4.0    # 15.625
+#region h2o block 1.0 499.0 0.1 17.0 20.0 40.0    # 15.6252
+
+#region h2o block 5.0 495.0 0.1 17.2 20.0 40.0
+region DoDb1 block 5.0 75.0 0.1 17.6 -120.0 -25.0 #74.0
+region DoDb2 block 65.0 125.0 0.1 17.6 -120.0 -65.0 #74.0
+region DoDb3 block 135.0 195.0 0.1 17.6 -120.0 -5.0 #74.0
+region DoDb4 block 205.0 225.0 0.1 17.6 -150.0 -85.0 #74.0
+region DoDb5 block 225.0 305.0 0.1 17.6 -150.0 5.0 #74.0
+#region DoDb5_1 block 245.0 285.0 0.1 17.6 5.0 45.0 #74.0
+region DoDb5_1 block 225.0 305.0 0.1 17.6 5.0 45.0 #74.0
+region DoDb6 block 315.0 345.0 0.1 17.6 -130.0 -25.0 #74.0
+region DoDb7 block 345.0 385.0 0.1 17.6 -130.0 -25.0
+region DoDb8 block 385.0 495.0 0.1 17.6 -130.0 -15.0
+region DoD union 9 DoDb1 DoDb2 DoDb3 DoDb4 DoDb5 DoDb5_1 DoDb6 DoDb7 DoDb8
+
+region DoDu1 block 0.0 75.0 0.1 17.6 95.0 155.0  #-25
+region DoDu2 block 75.0 185.0 0.1 17.6 105.0 135.0
+region DoDu2_1 block 185.0 235.0 0.1 17.6 92.0 120.0
+region DoDu3 block 235.0 285.0 0.1 17.6 100.0 120.0
+region DoDu4 block 285.0 350.0 0.1 17.6 95.0 120.0
+region DoDu5 block 350.0 420.0 0.1 17.6 95.0 155.0
+region DoDu6 block 420.0 500.0 0.1 17.6 95.0 155.0
+region h2o union 7 DoDu1 DoDu2 DoDu2_1 DoDu3 DoDu4 DoDu5 DoDu6
+
+#region DoD union 2 DoDu DoDb
+
+
+#region h2o block INF INF INF INF -4.0 4.0
+ 
+
+lattice sc 10.0 # 18.0 #3.5
+
+#variable    Nw equal 10 #1000              # <-- choose how many you want
+#create_atoms 0 random ${Nw} 928374 h2o mol H2O_mol 473829 overlap 2.0 maxtry 100000
+create_atoms 0 region DoD mol DoD_mol 473829 rotate 50 0 0 1
+
+lattice sc 3.5
+create_atoms 0 region h2o mol H2O_mol 473829 
+
+#write_data init_data.dat
+
+group top region top
+group bot region bot
+group typ1 type 1
+group typ2 type 2
+group typ3 type 3
+group typ4 type 4
+group C type 5
+group H type 6
+group OW type 7
+group HW type 8
+group CH union C H
+group OHW union OW HW
+
+delete_atoms overlap 3.6 CH typ1 mol yes bond yes
+delete_atoms overlap 3.6 CH typ2 mol yes bond yes
+delete_atoms overlap 3.6 OHW typ1 mol yes bond yes
+delete_atoms overlap 3.6 OHW typ2 mol yes bond yes
+
+write_data init.data nocoeff
+
+#XX
+
+group top clear
+group bot clear
+group C clear
+group H clear
+group OW clear
+group HW clear
+group CH clear
+group OHW clear
+
+group top region top
+group bot region bot
+group C type 5
+group H type 6
+group CH union C H
+group OW type 7
+group HW type 8
+group CH union C H
+group OHW union OW HW
+
+group top_1 region h2o
+group bot_1 region DoD
+group top_mol intersect top_1 OHW
+group bot_mol intersect bot_1 CH
+
+#XX
+
+group top_slab intersect top typ4
+group bot_slab intersect bot typ4
+group top_layer intersect top typ3
+group bot_layer intersect bot typ3
+
+group slab union top_slab bot_slab
+group layer union top_layer bot_layer
+
+#group frozen region freeze
+#group mobile subtract all frozen
+group nonrigid subtract all slab 
+group mobile subtract all slab layer
+
+group shake_grp union OHW CH
+fix shakeW shake_grp shake 1.0e-6 200 0 b 3 4 a 4
+#fix shakeDoD CH shake 1.0e-6 200 0 b 3 # mol yes # H2O_mol
+#fix shakeW OHW shake 1.0e-6 200 0 b 4 a 4 mol H2O_mol
+
+fix top_move top_slab move linear 0.0 0.0 0.0 # ${indent_rate}
+fix bot_fix bot_slab move linear 0.0 0.0 0.0
+fix top_layer_move top_layer move linear 0.0 0.0 NULL # ${indent_rate}
+fix bot_layer_move bot_layer move linear 0.0 0.0 NULL
+
+fix gu top_mol gravity 9.81e-5 vector 0.0 0.0 1.0    # 9.81e-14
+fix gb bot_mol gravity 9.81e-5 vector 0.0 0.0 -1.0
+#fix bot_fix bot_layer setforce 0.0 0.0 0.0
+#fix freeze indenter setforce 0.0 0.0 0.0
+
+#fix 3 all print 100 "${msxx} ${msyy} ${mszz}" file stress.dat screen no
+
+#fix 1 all press/langevin temp 300 300 395724215 x 0.0 0.0 2.0 y 0.0 0.0 2.0
+#fix 2 all langevin 300 300 2.0 4032548 zero yes gjf vfull
+#fix 3 all nve
+#velocity H2O set 0.0 0.0 0.0 sum yes mom yes rot yes units box
+
+#velocity CH create 300.0 4928459 rot yes mom yes dist gaussian loop geom
+
+#fix 1 all press/langevin temp 300 300 395724215 x 0.0 0.0 5.0 y 0.0 0.0 5.0 # couple xy
+#fix 2 nonrigid gjf 300 300 1.0 4032548 vel vhalf method 8
+#fix 2 mobile langevin 0.1 0.10 1.0 4032548 zero yes gjf vfull
+#fix int mobile nve #/limit 0.01
+#fix 2 nonrigid gjf 300 300 1.0 4032548 vel vhalf method 8
+#compute myTemp mobile temp #/partial 1 1 0
+#fix_modify 2 temp myTemp
+
+group cu_mobile subtract mobile CH OHW
+
+fix cu_thermo mobile langevin 300.0 300.0 1.0 4032548 gjf vfull
+
+compute myTemp mobile temp/partial 1 1 0
+fix_modify cu_thermo temp myTemp
+#fix mynve mobile nve
+fix mynve cu_mobile nve
+fix mynve0 CH nve/limit 0.1
+fix mynveW OHW nve
+#fix cu_thermo mobile langevin 300.0 300.0 1.0 4032548 gjf vfull
+
+
+#fix int_top top_layer nve
+#fix int_bot bot_layer nve
+
+#fix file all print 100 "${msxx} ${msyy} ${mszz}" file stress.dat screen no
+
+#variable fz equal f_top_move
+
+
+compute Ftop top_slab reduce sum fx fy fz
+variable fx equal c_Ftop[1]
+variable fy equal c_Ftop[2]
+variable fz equal c_Ftop[3]
+
+compute Pos_top top_slab reduce ave x y z
+variable Px equal c_Pos_top[1]
+variable Py equal c_Pos_top[2]
+variable Pz equal c_Pos_top[3]
+
+variable indent equal step*(-${indent_rate})*${dt}
+
+thermo_style custom step temp c_myTemp pe press pxx pyy pzz v_fx v_fy v_fz v_Pz fmax fnorm v_indent
+thermo 100
+# FIXES
+#compute	p all stress/atom myTemp
+#compute vpa all voronoi/atom
+#variable	sxx atom "c_p[1] / c_vpa[1]"
+#variable	syy atom "c_p[2] / c_vpa[1]"
+#variable	szz atom "c_p[3] / c_vpa[1]"
+#variable	sxy atom "c_p[4] / c_vpa[1]"
+#variable	sxz atom "c_p[5] / c_vpa[1]"
+#variable	syz atom "c_p[6] / c_vpa[1]"
+#variable vonMises atom "sqrt((v_sxx-v_syy)^2+(v_syy-v_szz)^2+(v_szz-v_sxx)^2+6*(v_sxy^2+v_sxz^2+v_syz^2))/sqrt(2)"
+
+#fix aveStress all ave/atom 20 100 2000 v_sxx v_syy v_szz v_sxy v_sxz v_syz v_vonMises
+
+#fix aveStress all ave/atom 5 10 500 c_p[*]
+#fix aveVM all ave/atom 
+
+#variable fz f_top_move[1]
+
+#compute mean_sxx all reduce ave v_sxx
+#compute mean_syy all reduce ave v_syy
+#compute mean_szz all reduce ave v_szz
+#variable msxx equal c_mean_sxx
+#variable msyy equal c_mean_syy
+#variable mszz equal c_mean_szz
+
+#fix 3 all 
+#fix 3 all print 100 "$x $y $z" file coord.txt
+fix          data    all print 1000 "${Pz} ${fx} ${fy} ${fz}" file force_displacement.dat screen no
+
+# DUMPING
+dump	1 all custom 2000 ${dump_dir}/dump_adsorb.lammpstrj id mol type x y z vx vy vz
+#restart 2000 restarts/restart.*.adsorb
+run 50000
+#XX
+######
+undump 1
+unfix gu
+unfix gb
+
+group top delete
+group bot delete
+group top region top
+group bot region bot
+
+#uncompute myTemp
+#unfix cu_thermo
+#unfix mynve
+#unfix mynve0 
+reset_timestep 0
+#fix top_move_0 top_slab move linear 0.0 0.0 0.0 # ${indent_rate}
+#fix bot_fix_0 bot_slab move linear 0.0 0.0 0.0
+
+dump    1 all custom 2000 ${dump_dir}/dump_press.lammpstrj id mol type x y z vx vy vz
+restart 2000 restarts/restart.*.adsorb
+run 50000
+
+displace_atoms top move 0 0 -90.0 units box
+displace_atoms bot move 0 0 90.0 units box
+write_restart restart.adsorbed
+write_data adsorbed.data nocoeff
+XX
+
+unfix mynve
+unfix mynve0
+unfix top_move
+unfix bot_fix
+undump 1
+
+fix top_move top_slab move linear 0.0 0.0 ${speed_top} # ${indent_rate}
+fix bot_fix bot_slab move linear 0.0 0.0 ${speed_bot}
+
+
+fix mynve mobile nve
+#fix mynve0 CH nve/limit 0.1
+#
+#
+restart 2000 restarts/restart.*.adsorb
+dump    1 all custom 2000 ${dump_dir}/dump_passiv.lammpstrj id mol type x y z vx vy vz 
+
+run 50000
+
+displace_atoms top move 0 0 -50.0 units box
+displace_atoms bot move 0 0 50.0 units box
+
+write_dump all atom dump_adsorbed.atom 
+# write out last config
+write_data adsorbed.data
+write_restart restart.adsorbed
+

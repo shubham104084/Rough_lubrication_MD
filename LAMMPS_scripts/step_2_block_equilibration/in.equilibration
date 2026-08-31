@@ -1,0 +1,109 @@
+# SYSTEM definition
+boundary p p f
+units metal
+atom_style full
+
+read_data ../step_1_config_gen/config.data
+#read_data initial.data
+balance 1.1 shift xyz 20 1.0
+neighbor 1.0 bin 
+neigh_modify delay 1 check yes 
+
+
+# INTERACTIONS
+pair_style eam/alloy
+pair_coeff * * ../params/Cu_mishin1.eam.alloy Cu
+
+
+# VARIABLES
+variable dump_dir string dumps_longer
+variable runs equal 2e4
+variable dt equal 2e-3
+
+
+# SHELL COMMANDS
+shell mkdir ${dump_dir}
+
+
+# PARAMS
+timestep ${dt}
+
+#fix 1 all box/relax x 0.0 y 0.0 vmax 0.001
+#min_style cg
+#minimize 1e-12 1e-12 10000 10000
+
+thermo_style custom step temp pe press pxx pyy pzz lx ly lz
+thermo 100
+
+#unfix 1
+
+velocity all create 300.0 4928459 rot yes mom yes dist gaussian
+
+# FIXES
+compute	p all stress/atom NULL 
+compute vpa all voronoi/atom
+variable	sxx atom "c_p[1] / c_vpa[1]"
+variable	syy atom "c_p[2] / c_vpa[1]"
+variable	szz atom "c_p[3] / c_vpa[1]"
+variable	sxy atom "c_p[4] / c_vpa[1]"
+variable	sxz atom "c_p[5] / c_vpa[1]"
+variable	syz atom "c_p[6] / c_vpa[1]"
+variable vonMises atom "sqrt((v_sxx-v_syy)^2+(v_syy-v_szz)^2+(v_szz-v_sxx)^2+6*(v_sxy^2+v_sxz^2+v_syz^2))/sqrt(2)"
+
+fix aveStress all ave/atom 50 100 5000 v_sxx v_syy v_szz v_sxy v_sxz v_syz v_vonMises
+
+#fix aveStress all ave/atom 5 10 500 c_p[*]
+#fix aveVM all ave/atom 
+
+compute mean_sxx all reduce ave v_sxx
+compute mean_syy all reduce ave v_syy
+compute mean_szz all reduce ave v_szz
+variable msxx equal c_mean_sxx
+variable msyy equal c_mean_syy
+variable mszz equal c_mean_szz
+
+#fix 3 all print 100 "${msxx} ${msyy} ${mszz}" file stress.dat screen no
+
+#fix 1 all press/langevin temp 300 300 395724215 x 0.0 0.0 2.0 y 0.0 0.0 2.0
+#fix 2 all langevin 300 300 2.0 4032548 zero yes gjf vfull
+#fix 3 all nve
+
+fix 1 all press/langevin temp 300 300 395724215 x 0.0 0.0 2.0 y 0.0 0.0 2.0 # couple xy
+#fix 2 all gjf 300 300 2.0 4032548 vel vhalf method 8
+fix 2 all langevin 300 300 2.0 4032548 gjf vhalf
+fix int all nve/limit 0.01
+fix file all print 100 "${msxx} ${msyy} ${mszz}" file stress.dat screen no
+
+#fix 3 all 
+#fix 3 all print 100 "$x $y $z" file coord.txt
+#fix             3 all print 1000 "${epsilon} ${strain_zz} ${gamma_xz} ${gamma} ${Pxz} ${Pzz} ${Lz0} ${Lz} ${Temp}" file force_displacement.dat screen no
+
+# DUMPING
+dump	1 all custom 5000 ${dump_dir}/dump_baro.lammpstrj id mol type x y z v_vonMises f_aveStress[1] f_aveStress[2] f_aveStress[3] f_aveStress[4] f_aveStress[5] f_aveStress[6] f_aveStress[7] c_vpa[1] c_vpa[2]
+#dump_modify	1 sort id units yes
+#dump    1 all custom 500 ${dump_dir}/dump.lammpstrj id mol type x y z v_vonMises v_sxx[1] v_syy[2] v_szz[3] v_sxy[4] v_sxz[5] v_syz[6] c_vpa[1] c_vpa[2]
+
+run 50000
+unfix 2
+unfix int
+
+fix 2 all gjf 300 300 2.0 4032548 vel vhalf method 8
+
+# RUN
+run 50000
+
+# write out last config
+#write_data barostatted_out.data
+write_restart restart_baro.equil
+
+undump 1
+unfix 1
+
+dump    1 all custom 5000 ${dump_dir}/dump_equil.lammpstrj id mol type x y z v_vonMises f_aveStress[1] f_aveStress[2] f_aveStress[3] f_aveStress[4] f_aveStress[5] f_aveStress[6] f_aveStress[7] c_vpa[1] c_vpa[2]
+
+run 100000
+
+# write out last config
+write_data equil_out.data
+write_restart restart.equil
+

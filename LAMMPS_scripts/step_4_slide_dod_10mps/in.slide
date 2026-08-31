@@ -1,0 +1,156 @@
+# SYSTEM definition
+boundary p p f
+units metal
+atom_style full
+
+
+read_restart ../../passivation/z_50_10_2/restarts/restart.passive_final
+
+# INTERACTIONS
+# 1-4: Cu
+# 5 : C
+# 6 : H
+
+special_bonds   lj/coul 0 0 0.5
+pair_style hybrid lj/cut/coul/long 12.0 eam/alloy
+kspace_style pppm 1e-5
+# 
+kspace_modify slab 3.0
+
+pair_coeff * * eam/alloy ../../params/Cu_mishin1.eam.alloy Cu Cu Cu Cu NULL NULL
+pair_coeff 5 5 lj/cut/coul/long 0.00290539571 3.5 # C-C
+pair_coeff 6 6 lj/cut/coul/long 0.00130092345 2.5 # H-H
+pair_coeff 5 6 lj/cut/coul/long 0.00194414439 3.0 # C-H
+pair_coeff 1 5 lj/cut/coul/long 0.02438598766 3.058 # Cu-C
+pair_coeff 2 5 lj/cut/coul/long 0.02438598766 3.058 # Cu-C
+pair_coeff 3 5 lj/cut/coul/long 0.02438598766 3.058 # Cu-C
+pair_coeff 4 5 lj/cut/coul/long 0.02438598766 3.058 # Cu-C
+pair_coeff 1 6 lj/cut/coul/long 0.016317873996 2.558  # Cu-H
+pair_coeff 2 6 lj/cut/coul/long 0.016317873996 2.558  # Cu-H
+pair_coeff 3 6 lj/cut/coul/long 0.016317873996 2.558  # Cu-H
+pair_coeff 4 6 lj/cut/coul/long 0.016317873996 2.558  # Cu-H
+
+
+#
+# Setting up DoD
+molecule DoD_mol ../../params/n_dodecane_opls2.mol toff 4 boff 1
+
+bond_style harmonic 
+bond_coeff 1 2.2e-2 20.0 # Cu- Cu(Pseudo)
+bond_coeff 2   11.6216 1.529   #13.443  1.529   # CT-CT
+bond_coeff 3   14.7438 1.090  #14.744  1.090   # CT-HC
+
+angle_style harmonic
+angle_coeff 1   1.4310 107.8   # 1.4310   107.8   # H-C-H
+angle_coeff 2   2.5368 112.7   #2.7319   112.7   # C-C-C
+angle_coeff 3   1.6262 110.7   #1.5177   110.7   # C-C-H
+
+dihedral_style  opls
+dihedral_coeff 1  0.0754535 -0.00680816  0.0120986 0.000  # C-C-C-C
+dihedral_coeff 2  0.0000000  0.00000000  0.0158713 0.000  # C-C-C-H
+dihedral_coeff 3  0.0000000  0.00000000  0.0137898  0.000  # H-C-C-H
+
+
+# VARIABLES
+variable dump_dir string dumps
+variable runs equal 2e4
+variable dt equal 2e-3
+
+# SHELL COMMANDS
+shell mkdir ${dump_dir}
+shell mkdir restarts
+
+# PARAMS
+timestep ${dt}
+
+variable indent_rate equal -0.1  #  unit is 100 m/s
+variable speed_top equal 0.5*${indent_rate}
+variable speed_bot equal -0.5*${indent_rate}
+fix top_move top_slab move linear ${speed_top} 0.0 0.0 # ${indent_rate}
+fix bot_fix bot_slab move linear ${speed_bot} 0.0 0.0
+fix top_layer_move top_layer move linear ${speed_top} 0.0 NULL # ${indent_rate}
+fix bot_layer_move bot_layer move linear ${speed_bot} 0.0 NULL
+
+fix shakeW CH shake 1.0e-6 200 0 b 3 
+
+fix cu_thermo thermo_cu langevin 300.0 300.0 1.0 4032548 gjf vfull
+
+compute myTemp thermo_cu temp/partial 0 1 0
+fix_modify cu_thermo temp myTemp
+fix mynve mobile nve
+
+compute Flayer top_layer group/group indenter
+variable fxl equal c_Flayer[1]
+variable fyl equal c_Flayer[2]
+variable fzl equal c_Flayer[3]
+
+compute Flayert top_layer reduce sum fx fy fz
+variable fxlt equal c_Flayert[1]
+variable fylt equal c_Flayert[2]
+variable fzlt equal c_Flayert[3]
+
+compute Ftop top_slab reduce sum fx fy fz
+variable fx equal c_Ftop[1]
+variable fy equal c_Ftop[2]
+variable fz equal c_Ftop[3]
+
+compute Ftsum top_sum reduce sum fx fy fz
+variable fxs equal c_Ftsum[1]
+variable fys equal c_Ftsum[2]
+variable fzs equal c_Ftsum[3]
+
+compute Pos_top top_slab reduce ave x y z
+variable Px equal c_Pos_top[1]
+variable Py equal c_Pos_top[2]
+variable Pz equal c_Pos_top[3]
+
+variable step0 equal step
+variable indent equal (step-${step0})*(${indent_rate})*${dt}
+
+thermo_style custom step v_indent temp c_myTemp pe press pxx pyy pzz v_fx v_fy v_fz v_Pz v_fxl v_fyl v_fzl v_fxs v_fys v_fzs v_fxlt v_fylt v_fzlt
+thermo 1000
+# FIXES
+compute	p all stress/atom myTemp
+compute vpa all voronoi/atom
+variable	sxx atom "c_p[1] / c_vpa[1]"
+variable	syy atom "c_p[2] / c_vpa[1]"
+variable	szz atom "c_p[3] / c_vpa[1]"
+variable	sxy atom "c_p[4] / c_vpa[1]"
+variable	sxz atom "c_p[5] / c_vpa[1]"
+variable	syz atom "c_p[6] / c_vpa[1]"
+variable vonMises atom "sqrt((v_sxx-v_syy)^2+(v_syy-v_szz)^2+(v_szz-v_sxx)^2+6*(v_sxy^2+v_sxz^2+v_syz^2))/sqrt(2)"
+
+fix aveStress all ave/atom 20 100 2000 v_sxx v_syy v_szz v_sxy v_sxz v_syz v_vonMises
+fix aveforce all ave/time 1 10000 10000 c_Flayert[1] c_Flayert[2] c_Ftop[3]
+
+variable        favgx equal "f_aveforce[1]"
+variable        favgy equal "f_aveforce[2]"
+variable        favgz equal "f_aveforce[3]"
+
+
+compute mean_sxx all reduce ave v_sxx
+compute mean_syy all reduce ave v_syy
+compute mean_szz all reduce ave v_szz
+variable msxx equal c_mean_sxx
+variable msyy equal c_mean_syy
+variable mszz equal c_mean_szz
+
+fix          data    all print 10000 "${indent} ${Px} ${Py} ${Pz} ${fxlt} ${fylt} ${fz} ${favgx} ${favgy} ${favgz}" file force_displacement.dat screen no
+
+fix aveforce2 all ave/time 1 5000 5000 c_Flayert[1] c_Flayert[2] c_Ftop[3]
+variable        favgx2 equal "f_aveforce2[1]"
+variable        favgy2 equal "f_aveforce2[2]"
+variable        favgz2 equal "f_aveforce2[3]"
+
+fix          data2    all print 5000 "${indent} ${Px} ${Py} ${Pz} ${fxlt} ${fylt} ${fz} ${favgx2} ${favgy2} ${favgz2}" file force_displacement2.dat screen no
+
+
+
+
+
+# DUMPING
+dump	1 all custom 20000 ${dump_dir}/dump_slide.lammpstrj id mol type x y z vx vy vz fx fy fz v_vonMises f_aveStress[1] f_aveStress[2] f_aveStress[3] f_aveStress[4] f_aveStress[5] f_aveStress[6] f_aveStress[7] c_vpa[1] c_vpa[2]
+
+restart 20000 restarts/restart.*.slide
+
+run 5000000
